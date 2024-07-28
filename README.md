@@ -80,10 +80,6 @@ The application logs important events to a file named `password_manager.log`.
 
 Contributions to improve the security, functionality, or user interface of this password manager are welcome. Please submit pull requests or open issues on the GitHub repository.
 
-## License
-
-[Specify your chosen license here]
-
 ## Disclaimer
 
 This password manager is a demonstration project and may not be suitable for production use without further security audits and enhancements.
