@@ -9,19 +9,6 @@ import logging
 from functools import partial
 import secrets
 import threading
-
-# Ensure all required packages are installed
-def install_required_packages():
-    required_packages = ['argon2-cffi', 'cryptography', 'pyperclip']
-    for package in required_packages:
-        try:
-            __import__(package)
-        except ImportError:
-            print(f"Installing {package}...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-install_required_packages()
-
 import pyperclip
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
@@ -73,22 +60,22 @@ class PasswordDatabase:
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-            CREATE TABLE IF NOT EXISTS passwords (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL,
-                platform_key TEXT NOT NULL,
-                encrypted_password TEXT NOT NULL,
-                salt TEXT NOT NULL
-            )
+                CREATE TABLE IF NOT EXISTS passwords (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL,
+                    platform_key TEXT NOT NULL,
+                    encrypted_password TEXT NOT NULL,
+                    salt TEXT NOT NULL
+                )
             """)
             cursor.execute("""
-            CREATE TABLE IF NOT EXISTS master_password (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                hashed_password TEXT NOT NULL,
-                salt TEXT NOT NULL
-            )
+                CREATE TABLE IF NOT EXISTS master_password (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    hashed_password TEXT NOT NULL,
+                    salt TEXT NOT NULL
+                )
             """)
-        logging.info("Database tables created successfully")
+            logging.info("Database tables created successfully")
 
     def store_password(self, email: str, platform_key: str, encrypted_password: bytes, salt: bytes):
         with sqlite3.connect(self.db_name) as conn:
@@ -97,7 +84,7 @@ class PasswordDatabase:
                 "INSERT INTO passwords (email, platform_key, encrypted_password, salt) VALUES (?, ?, ?, ?)",
                 (email, platform_key, base64.b64encode(encrypted_password).decode(), base64.b64encode(salt).decode())
             )
-        logging.info(f"Password stored for {email} on {platform_key}")
+            logging.info(f"Password stored for {email} on {platform_key}")
 
     def retrieve_password(self, email: str, platform_key: str) -> tuple:
         with sqlite3.connect(self.db_name) as conn:
@@ -106,41 +93,6 @@ class PasswordDatabase:
             result = cursor.fetchone()
             if result:
                 return base64.b64decode(result[0]), base64.b64decode(result[1])
-            return None, None
-
-    def update_password(self, email: str, platform_key: str, new_encrypted_password: bytes, new_salt: bytes):
-        with sqlite3.connect(self.db_name) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE passwords SET encrypted_password=?, salt=? WHERE email=? AND platform_key=?",
-                (base64.b64encode(new_encrypted_password).decode(), base64.b64encode(new_salt).decode(), email, platform_key)
-            )
-            if cursor.rowcount == 0:
-                raise ValueError("No matching password found to update")
-        logging.info(f"Password updated for {email} on {platform_key}")
-
-    def delete_password(self, email: str, platform_key: str):
-        with sqlite3.connect(self.db_name) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM passwords WHERE email=? AND platform_key=?", (email, platform_key))
-            if cursor.rowcount == 0:
-                raise ValueError("No matching password found to delete")
-        logging.info(f"Password deleted for {email} on {platform_key}")
-
-    def store_master_password(self, hashed_password: str, salt: bytes):
-        with sqlite3.connect(self.db_name) as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO master_password (id, hashed_password, salt) VALUES (1, ?, ?)",
-                           (hashed_password, base64.b64encode(salt).decode()))
-        logging.info("Master password stored successfully")
-
-    def get_master_password(self) -> tuple:
-        with sqlite3.connect(self.db_name) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT hashed_password, salt FROM master_password WHERE id=1")
-            result = cursor.fetchone()
-            if result:
-                return result[0], base64.b64decode(result[1])
             return None, None
 
     def get_all_passwords(self):
@@ -160,7 +112,7 @@ class PasswordDatabase:
                 fernet, salt = generate_key(master_password)
                 encrypted_data = fernet.encrypt(str(data).encode())
                 file.write(encrypted_data)
-            logging.info("Passwords exported successfully")
+                logging.info("Passwords exported successfully")
 
     def import_passwords(self, file_path: str, master_password: str):
         with open(file_path, 'rb') as file:
@@ -171,23 +123,6 @@ class PasswordDatabase:
         for email, platform_key, encrypted_password, salt in passwords:
             self.store_password(email, platform_key, base64.b64decode(encrypted_password), base64.b64decode(salt))
         logging.info("Passwords imported successfully")
-
-    def backup_database(self, backup_file: str):
-        with sqlite3.connect(self.db_name) as conn:
-            with open(backup_file, 'wb') as f:
-                for line in conn.iterdump():
-                    f.write(f'{line}\n'.encode())
-        logging.info("Database backup created successfully")
-
-    def restore_database(self, backup_file: str):
-        with sqlite3.connect(self.db_name) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DROP TABLE IF EXISTS passwords")
-            cursor.execute("DROP TABLE IF EXISTS master_password")
-            with open(backup_file, 'rb') as f:
-                sql_script = f.read().decode()
-                conn.executescript(sql_script)
-        logging.info("Database restored successfully")
 
 class PasswordManager:
     def __init__(self, master):
@@ -200,6 +135,10 @@ class PasswordManager:
     def setup_ui(self):
         self.master.title("Secure Password Manager")
         self.master.geometry("600x450")
+        self.master.bind('<Control-n>', lambda e: self.add_password())  # Ctrl+N for adding password
+        self.master.bind('<Control-r>', lambda e: self.get_password())  # Ctrl+R for retrieving password
+        self.master.bind('<Control-e>', lambda e: self.export_passwords())  # Ctrl+E for exporting passwords
+        self.master.bind('<Control-i>', lambda e: self.import_passwords())  # Ctrl+I for importing passwords
 
         style = ttk.Style()
         style.theme_use('clam')
@@ -218,65 +157,50 @@ class PasswordManager:
     def setup_master_password_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Master Password")
-
         ttk.Label(tab, text="Enter Master Password:").pack(pady=10)
         self.master_password_entry = ttk.Entry(tab, show="*")
         self.master_password_entry.pack(pady=10)
-
         ttk.Button(tab, text="Set/Verify Master Password", command=self.handle_master_password).pack(pady=10)
 
     def setup_add_password_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Add Password")
-
         ttk.Label(tab, text="Email:").pack(pady=5)
         self.add_email_entry = ttk.Entry(tab)
         self.add_email_entry.pack(pady=5)
-
         ttk.Label(tab, text="Platform:").pack(pady=5)
         self.add_platform_entry = ttk.Entry(tab)
         self.add_platform_entry.pack(pady=5)
-
         ttk.Label(tab, text="Password:").pack(pady=5)
         self.add_password_entry = ttk.Entry(tab, show="*")
         self.add_password_entry.pack(pady=5)
-
         ttk.Button(tab, text="Store Password", command=self.add_password).pack(pady=10)
 
     def setup_get_password_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Get Password")
-
         ttk.Label(tab, text="Email:").pack(pady=5)
         self.get_email_entry = ttk.Entry(tab)
         self.get_email_entry.pack(pady=5)
-
         ttk.Label(tab, text="Platform:").pack(pady=5)
         self.get_platform_entry = ttk.Entry(tab)
         self.get_platform_entry.pack(pady=5)
-
         ttk.Button(tab, text="Retrieve Password", command=self.get_password).pack(pady=10)
-
         ttk.Label(tab, text="Password:").pack(pady=5)
         self.retrieved_password_label = ttk.Label(tab, text="")
         self.retrieved_password_label.pack(pady=5)
-
         ttk.Button(tab, text="Copy Password to Clipboard", command=self.copy_password_to_clipboard).pack(pady=10)
 
     def setup_view_passwords_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="View Passwords")
-
         self.passwords_tree = ttk.Treeview(tab, columns=("Email", "Platform"), show="headings")
         self.passwords_tree.heading("Email", text="Email")
         self.passwords_tree.heading("Platform", text="Platform")
         self.passwords_tree.pack(expand=1, fill="both", padx=10, pady=10)
-
         ttk.Button(tab, text="Refresh", command=self.refresh_password_list).pack(pady=10)
         ttk.Button(tab, text="Export Passwords", command=self.export_passwords).pack(pady=10)
         ttk.Button(tab, text="Import Passwords", command=self.import_passwords).pack(pady=10)
-        ttk.Button(tab, text="Backup Database", command=self.backup_database).pack(pady=10)
-        ttk.Button(tab, text="Restore Database", command=self.restore_database).pack(pady=10)
 
     def handle_master_password(self):
         master_password = self.master_password_entry.get()
@@ -297,15 +221,12 @@ class PasswordManager:
         if not self.master_password:
             messagebox.showerror("Error", "Please set/verify master password first!")
             return
-
         email = self.add_email_entry.get()
         platform_key = self.add_platform_entry.get()
         password = self.add_password_entry.get()
-
         if not email or not platform_key or not password:
             messagebox.showerror("Error", "All fields are required!")
             return
-
         encrypted_password, salt = encrypt_password(password, self.master_password)
         self.db.store_password(email, platform_key, encrypted_password, salt)
         messagebox.showinfo("Info", "Password stored successfully!")
@@ -317,14 +238,11 @@ class PasswordManager:
         if not self.master_password:
             messagebox.showerror("Error", "Please set/verify master password first!")
             return
-
         email = self.get_email_entry.get()
         platform_key = self.get_platform_entry.get()
-
         if not email or not platform_key:
             messagebox.showerror("Error", "All fields are required!")
             return
-
         encrypted_password, salt = self.db.retrieve_password(email, platform_key)
         if encrypted_password and salt:
             password = decrypt_password(encrypted_password, self.master_password, salt)
@@ -362,19 +280,6 @@ class PasswordManager:
         if file_path:
             self.db.import_passwords(file_path, self.master_password)
             messagebox.showinfo("Info", "Passwords imported successfully!")
-            self.refresh_password_list()
-
-    def backup_database(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".db", filetypes=[("Database Files", "*.db")])
-        if file_path:
-            self.db.backup_database(file_path)
-            messagebox.showinfo("Info", "Database backup created successfully!")
-
-    def restore_database(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Database Files", "*.db")])
-        if file_path:
-            self.db.restore_database(file_path)
-            messagebox.showinfo("Info", "Database restored successfully!")
             self.refresh_password_list()
 
 if __name__ == "__main__":
