@@ -1,67 +1,56 @@
-# Secure Password Manager
+# Secure Notes App
 
-A Python-based secure password manager with a graphical user interface using Tkinter.
+A secure password and notes manager application built with Python and Tkinter.
 
 ## Features
 
-- Secure storage of passwords using encryption
+- Secure storage of passwords and notes using encryption
 - Master password protection
 - Add and retrieve passwords
-- View all stored passwords
-- Export and import password data
-- Clipboard integration with auto-clear functionality
-- Keyboard shortcuts for quick access to common functions
+- Create and view secure notes
+- Backup and restore functionality
+- Password copying to clipboard
+- Database management with SQLite
+
+## Requirements
+
+- Python 3.x
+- tkinter
+- sqlite3
+- pyperclip
+- argon2-cffi
+- cryptography
 
 ## Installation
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/secure-password-manager.git
+   git clone https://github.com/yourusername/secure-notes-app.git
    ```
 
 2. Install the required packages:
    ```
-   pip install tkinter sqlite3 pyperclip argon2-cffi cryptography
+   pip install pyperclip argon2-cffi cryptography
    ```
 
 ## Usage
 
-Run the script:
+Run the application:
 
 ```
-python password_manager.py
+python secure_notes_app.py
 ```
 
-### Keyboard Shortcuts
-
-- `Ctrl+N`: Add a new password
-- `Ctrl+R`: Retrieve a password
-- `Ctrl+E`: Export passwords
-- `Ctrl+I`: Import passwords
+1. Set a master password when first running the application.
+2. Use the different tabs to manage passwords and notes.
+3. Create backups and restore data as needed.
 
 ## Security Features
 
-- Master password hashed using Argon2
-- Individual passwords encrypted using Fernet (AES-128 in CBC mode with PKCS7 padding)
-- PBKDF2 key derivation for encryption key
-- Automatic clipboard clearing after 10 seconds
-
-## Code Structure
-
-- `PasswordDatabase`: Handles database operations
-- `PasswordManager`: Manages the GUI and user interactions
-
-## Recent Improvements
-
-1. Added keyboard shortcuts for common operations
-2. Streamlined code by removing unnecessary package installation checks
-3. Focused on core password management features by removing backup and restore functionality
-4. Improved code organization and readability
-5. Simplified UI setup for easier maintenance
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+- Argon2 password hashing
+- AES encryption for stored data
+- Secure key derivation using PBKDF2
+- Salting for added security
 
 ## License
 
